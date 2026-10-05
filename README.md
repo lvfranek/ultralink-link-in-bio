@@ -6,6 +6,7 @@ Ultralink is a website builder for creators and agencies —
 build a fast, branded link page and see real analytics behind every click.
 
 ![Ultralink](public/ultralink-poster.jpg)
+![Ultralink](public/ultralink-poster-2.jpg)
 
 ## Table of Contents
 
