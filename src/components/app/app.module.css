@@ -1216,7 +1216,8 @@
   width: 52px;
   height: 52px;
   margin-bottom: 10px;
-  padding: 1.5px;
+  /* Whole pixels only: a fractional ring gets snapped unevenly (thicker on one side) */
+  padding: 2px;
   border-radius: 16px;
   background: var(--line-strong);
 }
@@ -1226,7 +1227,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 14.5px;
+  border-radius: 14px;
   background: #0e0e11;
   color: #fff;
 }
