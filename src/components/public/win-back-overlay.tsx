@@ -3,7 +3,16 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import type { WinBack, PageLink } from "@/lib/supabase/types";
-import { resolveTheme, fontVar, cornerRadius, animClass, resolveLinkStyle, DEFAULT_LINK_STYLE } from "@/lib/config/theme";
+import {
+  resolveTheme,
+  fontVar,
+  titleStyle,
+  buttonLook,
+  animClass,
+  resolveLinkStyle,
+  gradientEndColor,
+  DEFAULT_LINK_STYLE,
+} from "@/lib/config/theme";
 import type { Theme } from "@/lib/config/theme";
 import { isAdultConfirmed, showAdultGate } from "./adult-gate";
 
@@ -124,8 +133,13 @@ export function WinBackDialog({
   const cardBg = theme.pageBg.type === "image" ? "#0A0A0B" : theme.pageBg.value;
   const ls = firstLink
     ? resolveLinkStyle(firstLink)
-    : { ...DEFAULT_LINK_STYLE, fillType: "color" as const, fillValue: theme.colors.name, textColor: cardBg };
-  const btnRadius = cornerRadius(ls.corner);
+    : {
+        ...DEFAULT_LINK_STYLE,
+        fillType: "color" as const,
+        fillValue: theme.colors.name,
+        textColor: theme.pageBg.type === "gradient" ? gradientEndColor(cardBg) : cardBg,
+      };
+  const look = buttonLook(theme.buttonVariant ?? "solid", ls);
   const btnAnimCls = animClass(ls.animation);
   const titleFont = fontVar(theme.fonts.title);
   const nameColor = theme.colors.name;
@@ -250,7 +264,7 @@ export function WinBackDialog({
         {/* Headline */}
         <p
           className="text-lg font-bold leading-snug mb-6"
-          style={{ color: nameColor, fontFamily: titleFont }}
+          style={{ color: nameColor, fontFamily: titleFont, fontWeight: titleStyle(theme.fonts.title).fontWeight }}
         >
           {winBack.headline}
         </p>
@@ -260,12 +274,8 @@ export function WinBackDialog({
           href={winBack.url}
           target="_blank"
           rel="noopener noreferrer"
-          className={`w-full flex items-center justify-center font-semibold text-sm py-3.5 mb-3 transition-opacity hover:opacity-85 ${btnAnimCls}`}
-          style={{
-            background: ls.fillValue,
-            color: ls.textColor,
-            borderRadius: btnRadius,
-          }}
+          className={`w-full flex items-center justify-center font-semibold text-sm py-3.5 mb-3 ${look.className} ${btnAnimCls}`}
+          style={{ ...look.style, fontFamily: fontVar(theme.fonts.body) }}
           onClick={onCtaClick}
         >
           Yes, show me →

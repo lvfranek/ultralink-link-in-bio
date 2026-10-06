@@ -2,13 +2,13 @@
 
 import { useEffect } from "react";
 import type { Page, PageLink, PageSocial } from "@/lib/supabase/types";
-import type { Theme } from "@/lib/config/theme";
+import type { ButtonVariant, Theme } from "@/lib/config/theme";
 import {
-  DEFAULT_THEME,
   resolveTheme,
   resolveLinkStyle,
   fontVar,
-  cornerRadius,
+  titleStyle,
+  buttonLook,
   animClass,
   gradientEndColor,
 } from "@/lib/config/theme";
@@ -41,9 +41,24 @@ function isLightColor(hex: string): boolean {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.5;
 }
 
+// The cover photo fades out at the bottom and lets the real page background show
+// through, so it blends into any background: a colour, a gradient, a glow or an image.
+// The extra stops ease the fade so it has no visible start line.
+const HERO_FADE =
+  "linear-gradient(to bottom, #000 0%, #000 40%, rgb(0 0 0 / 0.8) 58%, rgb(0 0 0 / 0.45) 75%, rgb(0 0 0 / 0.15) 90%, transparent 100%)";
+
 // ─── Background layer helper ──────────────────────────────────────────────────
 
-function BgLayer({ pageBgIsImage, value, overlay, blur = 0, className = "absolute inset-0" }: {
+function BgLayer({ grain = false, ...props }: Parameters<typeof BgFill>[0] & { grain?: boolean }) {
+  return (
+    <>
+      <BgFill {...props} />
+      {grain && <div className="ul-grain" />}
+    </>
+  );
+}
+
+function BgFill({ pageBgIsImage, value, overlay, blur = 0, className = "absolute inset-0" }: {
   pageBgIsImage: boolean;
   value: string;
   overlay: number;
@@ -84,11 +99,9 @@ export function ProfilePageView({
   isPro,
   highlightLinkId,
 }: ProfilePageViewProps) {
-  const theme: Theme = rawTheme && typeof rawTheme === "object" && "preset" in rawTheme
-    ? (rawTheme as Theme)
-    : resolveTheme(rawTheme as Record<string, unknown>);
-
-  const t = theme ?? DEFAULT_THEME;
+  // Always resolve: stored themes from before buttonVariant/texture existed lack those fields
+  const t: Theme = resolveTheme(rawTheme as Record<string, unknown> | null | undefined);
+  const grain = t.texture === "grain";
 
   const initial = (page.title || page.slug).charAt(0).toUpperCase();
   const isHero = page.avatar_style === "hero";
@@ -96,13 +109,6 @@ export function ProfilePageView({
   const pageBgIsImage = t.pageBg.type === "image" && !!t.pageBg.value;
   const overlay = t.pageBg.overlay ?? 0;
   const bgBlur = t.pageBg.blur ?? 0;
-
-  // Only solid-color backgrounds get a fade baked into the hero image — it blends
-  // the image bottom edge into a flat color seamlessly. Gradient backgrounds must
-  // stay off the image entirely (the gradient's end color tinting the whole photo
-  // reads as a broken color wash), so the hero renders unmodified and the gradient
-  // begins right below it.
-  const heroFadeColor: string | null = t.pageBg.type === "color" ? t.pageBg.value : null;
 
   // Contrast for the bottom panel is judged against the actual page background,
   // not the name/handle text colors — those are independent user picks and can't
@@ -153,13 +159,8 @@ export function ProfilePageView({
             src={page.avatar_url!}
             alt={page.title || page.slug}
             className="absolute inset-0 w-full h-full object-cover"
+            style={{ maskImage: HERO_FADE, WebkitMaskImage: HERO_FADE }}
           />
-          {heroFadeColor && (
-            <div
-              className="absolute inset-0"
-              style={{ background: `linear-gradient(to bottom, transparent 40%, ${heroFadeColor} 100%)` }}
-            />
-          )}
         </div>
       )}
 
@@ -191,7 +192,7 @@ export function ProfilePageView({
       {page.title && (
         <h1
           className="font-bold text-center text-xl mb-2"
-          style={{ color: nameColor, fontFamily: titleFont }}
+          style={{ color: nameColor, fontFamily: titleFont, ...titleStyle(t.fonts.title) }}
         >
           {page.title}
         </h1>
@@ -256,6 +257,8 @@ export function ProfilePageView({
                   index={index}
                   isPreview={isPreview ?? false}
                   highlighted={link.id === highlightLinkId}
+                  variant={t.buttonVariant}
+                  font={bodyFont}
                 />
               )
             )}
@@ -308,7 +311,7 @@ export function ProfilePageView({
        * `md:hidden` would suppress the background on any desktop viewport.
        */}
       <div className={`${isPreview ? "" : "md:hidden "}absolute inset-0 overflow-hidden`} aria-hidden>
-        <BgLayer pageBgIsImage={pageBgIsImage} value={t.pageBg.value} overlay={overlay} blur={bgBlur} />
+        <BgLayer pageBgIsImage={pageBgIsImage} value={t.pageBg.value} overlay={overlay} blur={bgBlur} grain={grain} />
       </div>
 
       {/* ── Desktop: fixed blurred-avatar backdrop (hidden on <768px) ── */}
@@ -331,7 +334,7 @@ export function ProfilePageView({
             />
           ) : (
             /* No avatar — fall back to the theme background unmodified */
-            <BgLayer pageBgIsImage={pageBgIsImage} value={t.pageBg.value} overlay={overlay} blur={bgBlur} />
+            <BgLayer pageBgIsImage={pageBgIsImage} value={t.pageBg.value} overlay={overlay} blur={bgBlur} grain={grain} />
           )}
         </div>
       )}
@@ -350,7 +353,7 @@ export function ProfilePageView({
           {/* Desktop card background — suppressed in preview (mobile bg covers everything) */}
           {!isPreview && (
             <div className="hidden md:block absolute inset-0" aria-hidden>
-              <BgLayer pageBgIsImage={pageBgIsImage} value={t.pageBg.value} overlay={overlay} blur={bgBlur} />
+              <BgLayer pageBgIsImage={pageBgIsImage} value={t.pageBg.value} overlay={overlay} blur={bgBlur} grain={grain} />
             </div>
           )}
 
@@ -419,14 +422,18 @@ function LinkButton({
   index,
   isPreview,
   highlighted = false,
+  variant,
+  font,
 }: {
   link: PageLink;
   index: number;
   isPreview: boolean;
   highlighted?: boolean;
+  variant: ButtonVariant;
+  font: string;
 }) {
   const ls = resolveLinkStyle(link);
-  const btnRadius = cornerRadius(ls.corner);
+  const look = buttonLook(variant, ls);
   const animCls = animClass(ls.animation);
 
   const redirectHref = isPreview ? link.url : `/r/${link.id}`;
@@ -446,17 +453,18 @@ function LinkButton({
       rel="noopener noreferrer"
       onClick={handleClick}
       className={[
-        "relative flex items-center w-full font-medium transition-brightness duration-150 active:scale-[0.99]",
+        "relative flex items-center w-full font-medium",
         "px-5 py-4 text-sm",
+        look.className,
         animCls,
       ].filter(Boolean).join(" ")}
       style={{
-        background: ls.fillValue,
-        color: ls.textColor,
-        borderRadius: btnRadius,
+        ...look.style,
+        fontFamily: font,
         animationDelay: ls.animation !== "none" ? `${index * 120}ms` : undefined,
-        boxShadow: highlighted ? "0 0 0 2px #fff, 0 0 0 4px #f7a8c4" : undefined,
-        transition: "box-shadow 0.2s ease",
+        // An outline, not a shadow, so it never fights the Soft / Hard shadow looks
+        outline: highlighted ? "2px solid #f7a8c4" : undefined,
+        outlineOffset: highlighted ? 3 : undefined,
       }}
     >
       {/* Icon floats on the left without occupying flex space, so the

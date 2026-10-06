@@ -1025,23 +1025,17 @@
 .miniDark .miniName {
   color: #fff;
 }
+/* Colours, corners and the button look come from .ul-btn (globals.css) */
 .miniPill {
   width: 100%;
   margin-top: 7px;
   padding: 6px 8px;
-  border-radius: 99px;
-  background: #111;
-  color: #fff;
   font-size: 8.5px;
   font-weight: 600;
   text-align: center;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-.miniDark .miniPill {
-  background: rgba(255, 255, 255, 0.92);
-  color: #111;
 }
 .miniName + .miniPill {
   margin-top: 12px;
@@ -3051,15 +3045,17 @@
   gap: 10px;
 }
 .preset {
-  padding: 8px;
-  border-radius: 14px;
+  padding: 6px 6px 10px;
+  border-radius: 16px;
   border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.025);
   color: var(--text);
   cursor: pointer;
+  text-align: center;
   transition:
     border-color 0.2s ease,
-    transform 0.3s var(--ease);
+    box-shadow 0.2s ease,
+    transform 0.25s var(--ease);
 }
 .preset:hover {
   border-color: var(--line-strong);
@@ -3069,37 +3065,104 @@
   border-color: rgba(247, 168, 196, 0.6);
   box-shadow: 0 0 0 3px rgba(247, 168, 196, 0.12);
 }
+/* A tiny version of the page: background, avatar, name, three buttons */
 .presetCanvas {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 5px;
-  padding: 12px 10px;
-  border-radius: 9px;
-  background: #fff;
+  gap: 6px;
+  padding: 14px 11px 16px;
+  border-radius: 11px;
+}
+/* Above the grain layer */
+.presetDot,
+.presetTitle,
+.presetPill {
+  position: relative;
 }
 .presetDot {
-  width: 18px;
-  height: 18px;
-  margin-bottom: 3px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   background: linear-gradient(135deg, #f59e8b, #e879b9 50%, #a78bfa);
 }
+.presetTitle {
+  margin-bottom: 3px;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.1;
+}
 .presetPill {
   width: 100%;
-  height: 9px;
+  height: 13px;
 }
 .presetName {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 5px;
-  margin-top: 8px;
+  margin-top: 9px;
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
 }
 .presetName svg {
   color: var(--pink);
+}
+.presetTag {
+  display: block;
+  margin-top: 2px;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+/* Button style picker: each option drawn on the page's own background */
+.btnStyleGrid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+.btnStyle {
+  padding: 4px 4px 8px;
+  border-radius: 13px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.025);
+  color: var(--text);
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+.btnStyle:hover {
+  border-color: var(--line-strong);
+}
+.btnStyleOn {
+  border-color: rgba(247, 168, 196, 0.6);
+  box-shadow: 0 0 0 3px rgba(247, 168, 196, 0.12);
+}
+.btnStyleCanvas {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 52px;
+  padding: 0 9px;
+  border-radius: 9px;
+}
+.btnStyleSample {
+  width: 100%;
+  padding: 5px 0;
+  font-size: 12px;
+  font-weight: 600;
+  pointer-events: none;
+}
+.btnStyleName {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
 }
 
 /* Settings */
@@ -3383,6 +3446,9 @@
   }
   .presetGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .btnStyleGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
   .linkClicks {
     display: none;

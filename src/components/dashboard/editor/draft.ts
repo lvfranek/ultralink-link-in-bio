@@ -4,9 +4,13 @@
 
 import {
   DEFAULT_LINK_STYLE,
+  DEFAULT_THEME,
   PRESETS,
+  bgCss,
   gradientEndColor,
   resolveTheme,
+  type ButtonVariant,
+  type LinkStyle,
   type PresetKey,
   type Theme,
 } from "@/lib/config/theme";
@@ -45,6 +49,12 @@ export interface Colors {
   icons: string;
 }
 
+/** "solid" is just colors.background; the others blend it into `to` */
+export interface DraftBg {
+  kind: "solid" | "linear" | "glow";
+  to: string;
+}
+
 export interface Draft {
   name: string;
   bio: string;
@@ -55,8 +65,12 @@ export interface Draft {
   /** "custom" once any colour has been changed by hand */
   preset: PresetKey | "custom";
   colors: Colors;
+  bg: DraftBg;
+  grain: boolean;
+  buttonVariant: ButtonVariant;
   corner: Corner;
-  font: string;
+  titleFont: string;
+  bodyFont: string;
   badge: boolean;
   /** Visitors confirm they're 18+ before they see the page at all */
   ageGate: boolean;
@@ -77,28 +91,58 @@ export function toHex(value: string | undefined, fallback: string): string {
   return /^#[0-9a-f]{6}$/i.test(v) ? v.toLowerCase() : fallback;
 }
 
-export function presetColors(key: PresetKey): Colors {
-  const { theme, linkStyle } = PRESETS[key];
+/** Everything the Design tab controls */
+export type DesignFields = Pick<
+  Draft,
+  "preset" | "colors" | "bg" | "grain" | "buttonVariant" | "corner" | "titleFont" | "bodyFont"
+>;
+
+function designFrom(theme: Theme, linkStyle: Pick<LinkStyle, "fillValue" | "textColor" | "corner">): DesignFields {
+  const g = theme.pageBg.gradient;
+  const background = toHex(g?.from ?? theme.pageBg.value, "#ffffff");
+  const button = toHex(linkStyle.fillValue, "#06aeef");
   return {
-    background: toHex(theme.pageBg.value, "#ffffff"),
-    button: toHex(linkStyle.fillValue, "#06aeef"),
-    buttonText: toHex(linkStyle.textColor, "#ffffff"),
-    name: toHex(theme.colors.name, "#0a0a0a"),
-    text: toHex(theme.colors.handle, "#5a5a5a"),
-    icons: toHex(theme.colors.icons, "#0a0a0a"),
+    preset: theme.preset,
+    colors: {
+      background,
+      button,
+      buttonText: toHex(linkStyle.textColor, "#ffffff"),
+      name: toHex(theme.colors.name, "#0a0a0a"),
+      text: toHex(theme.colors.handle, "#5a5a5a"),
+      icons: toHex(theme.colors.icons, "#0a0a0a"),
+    },
+    // A solid page still remembers a second colour, ready for when Gradient or Glow is picked
+    bg: g ? { kind: g.style, to: toHex(g.to, button) } : { kind: "solid", to: button },
+    grain: theme.texture === "grain",
+    buttonVariant: theme.buttonVariant,
+    corner: linkStyle.corner,
+    titleFont: theme.fonts.title,
+    bodyFont: theme.fonts.body,
   };
+}
+
+/** A theme's whole design, as applied when its tile is picked */
+export function presetDraft(key: PresetKey): DesignFields {
+  return designFrom(PRESETS[key].theme, PRESETS[key].linkStyle);
 }
 
 // ─── Stored page → draft ─────────────────────────────────────────────────────
 
 export function draftFromPage(page: Page, links: PageLink[], socials: PageSocial[]): Draft {
   const theme = resolveTheme(page.theme as Record<string, unknown>);
-  const presetKey = theme.preset !== "custom" && theme.preset in PRESETS ? (theme.preset as PresetKey) : null;
-  const fallback = presetColors(presetKey ?? "glacier");
+  const fallback = designFrom(
+    theme.preset === "custom" ? DEFAULT_THEME : PRESETS[theme.preset].theme,
+    theme.preset === "custom" ? DEFAULT_LINK_STYLE : PRESETS[theme.preset].linkStyle,
+  ).colors;
 
   // One style for every button: the first button's, as agreed for existing pages
   const first = links.find((l) => l.item_type === "button");
   const bg = theme.pageBg;
+  const design = designFrom(theme, {
+    fillValue: first?.fill_value ?? fallback.button,
+    textColor: first?.text_color ?? fallback.buttonText,
+    corner: (first?.corner as Corner) ?? DEFAULT_LINK_STYLE.corner,
+  });
   const wb = (page.win_back ?? { enabled: false, headline: "", url: "" }) as WinBack & { age_gate?: boolean };
 
   return {
@@ -117,18 +161,18 @@ export function draftFromPage(page: Page, links: PageLink[], socials: PageSocial
       icon: l.icon && l.icon.startsWith("http") ? l.icon : null,
     })),
     socials: socials.map((x) => ({ id: x.id, platform: x.platform, url: x.url })),
-    preset: presetKey ?? "custom",
+    ...design,
     colors: {
-      // A gradient keeps its end colour; an image falls back to the preset's background
-      background: bg.type === "image" ? fallback.background : toHex(bg.value, fallback.background),
-      button: toHex(first?.fill_value, fallback.button),
-      buttonText: toHex(first?.text_color, fallback.buttonText),
-      name: toHex(theme.colors.name, fallback.name),
-      text: toHex(theme.colors.handle, fallback.text),
-      icons: toHex(theme.colors.icons, fallback.icons),
+      ...design.colors,
+      // An editor-made gradient keeps its colours (via designFrom); an older one keeps its end
+      // colour, and an image falls back to the preset's background
+      background:
+        bg.type === "image"
+          ? fallback.background
+          : bg.gradient
+            ? design.colors.background
+            : toHex(bg.value, fallback.background),
     },
-    corner: ((first?.corner as Corner) ?? DEFAULT_LINK_STYLE.corner) as Corner,
-    font: theme.fonts.title,
     badge: page.active_badge ?? false,
     ageGate: page.age_gate_enabled ?? false,
     blockedCountries: Array.isArray(page.blocked_countries) ? page.blocked_countries : [],
@@ -139,10 +183,15 @@ export function draftFromPage(page: Page, links: PageLink[], socials: PageSocial
 // ─── Draft → stored shapes ───────────────────────────────────────────────────
 
 export function themeFromDraft(d: Draft): Theme {
+  const gradient = d.bg.kind === "solid" ? null : { style: d.bg.kind, from: d.colors.background, to: d.bg.to };
   return {
     preset: d.preset,
-    pageBg: { type: "color", value: d.colors.background, overlay: 0 },
-    fonts: { title: d.font, body: d.font },
+    pageBg: gradient
+      ? { type: "gradient", value: bgCss(gradient), overlay: 0, gradient }
+      : { type: "color", value: d.colors.background, overlay: 0 },
+    texture: d.grain ? "grain" : "none",
+    buttonVariant: d.buttonVariant,
+    fonts: { title: d.titleFont, body: d.bodyFont },
     colors: { name: d.colors.name, handle: d.colors.text, icons: d.colors.icons },
   };
 }

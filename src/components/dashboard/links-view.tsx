@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, type CSSProperties } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -47,6 +47,7 @@ import {
   usePopover,
 } from "@/components/app/ui";
 import { useNavigationLoading } from "@/components/dashboard/navigation-loading";
+import { buttonLook, type ButtonVariant, type LinkStyle } from "@/lib/config/theme";
 import s from "@/components/app/app.module.css";
 
 export interface PageCardData {
@@ -59,7 +60,9 @@ export interface PageCardData {
   /** CSS background of the public page: a colour, gradient or image */
   background: string;
   nameColor: string;
-  buttons: { label: string; background: string; color: string; radius: string }[];
+  grain: boolean;
+  buttonVariant: ButtonVariant;
+  buttons: { label: string; background: string; color: string; corner: LinkStyle["corner"] }[];
 }
 
 type Sort = "newest" | "oldest" | "name";
@@ -538,9 +541,13 @@ interface Actions {
   startLoading: () => void;
 }
 
+/** Scales the outline and hard shadow down to thumbnail size */
+const MINI_BTN = { "--btn-edge": "1px", "--btn-offset": "2px" } as CSSProperties;
+
 function MiniPhone({ page }: { page: PageCardData }) {
   return (
     <div className={s.miniPhone} style={{ background: page.background }} aria-hidden="true">
+      {page.grain && <div className="ul-grain" />}
       {page.avatarUrl ? (
         // eslint-disable-next-line @next/next/no-img-element -- user-uploaded image (Supabase Storage URL)
         <img src={page.avatarUrl} alt="" className={s.miniAvatarImg} />
@@ -550,15 +557,14 @@ function MiniPhone({ page }: { page: PageCardData }) {
       <div className={s.miniName} style={{ color: page.nameColor }}>
         {page.name || page.slug}
       </div>
-      {page.buttons.map((b, i) => (
-        <div
-          key={i}
-          className={s.miniPill}
-          style={{ background: b.background, color: b.color, borderRadius: b.radius }}
-        >
-          {b.label}
-        </div>
-      ))}
+      {page.buttons.map((b, i) => {
+        const look = buttonLook(page.buttonVariant, { fillValue: b.background, textColor: b.color, corner: b.corner });
+        return (
+          <div key={i} className={cx(s.miniPill, look.className)} style={{ ...look.style, ...MINI_BTN }}>
+            {b.label}
+          </div>
+        );
+      })}
     </div>
   );
 }

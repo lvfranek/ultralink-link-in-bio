@@ -1,35 +1,91 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState, type CSSProperties } from "react";
 import { Check, Eye, Lock, Search, X } from "lucide-react";
-import { BUTTON_CORNERS, FONT_OPTIONS, PRESET_META, PRESETS, cornerRadius, type PresetKey } from "@/lib/config/theme";
+import {
+  BUTTON_CORNERS,
+  BUTTON_VARIANTS,
+  FONT_OPTIONS,
+  PRESETS,
+  bgCss,
+  buttonLook,
+  fontVar,
+  titleStyle,
+  type ButtonVariant,
+  type PresetKey,
+} from "@/lib/config/theme";
 import { COUNTRY_NAMES, flagEmoji } from "@/lib/countries";
 import { WinBackDialog } from "@/components/public/win-back-overlay";
 import { useUpgradeModal } from "@/components/app/upgrade-context";
 import { cx, Dialog, Segmented } from "@/components/app/ui";
-import { normalizeUrl, presetColors, tidyUrl, urlError, type Colors, type Draft } from "./draft";
+import {
+  normalizeUrl,
+  presetDraft,
+  tidyUrl,
+  urlError,
+  type Colors,
+  type DesignFields,
+  type Draft,
+  type DraftBg,
+} from "./draft";
 import { Card, ColorField, contrast, ProBadge, Switch } from "./parts";
 import s from "@/components/app/app.module.css";
 
 // ─── Design ──────────────────────────────────────────────────────────────────
 
-const COLOR_FIELDS: { key: keyof Colors; label: string; against?: keyof Colors }[] = [
-  { key: "background", label: "Background" },
+const COLOR_FIELDS: { key: Exclude<keyof Colors, "background">; label: string }[] = [
   { key: "button", label: "Buttons" },
-  { key: "buttonText", label: "Button text", against: "button" },
-  { key: "name", label: "Name and headings", against: "background" },
-  { key: "text", label: "Bio and @handle", against: "background" },
-  { key: "icons", label: "Social icons", against: "background" },
+  { key: "buttonText", label: "Button text" },
+  { key: "name", label: "Name and headings" },
+  { key: "text", label: "Bio and @handle" },
+  { key: "icons", label: "Social icons" },
 ];
 
+const BG_KINDS: { value: DraftBg["kind"]; label: string }[] = [
+  { value: "solid", label: "Solid" },
+  { value: "linear", label: "Gradient" },
+  { value: "glow", label: "Glow" },
+];
+
+/** CSS background of the page as the draft has it */
+function draftBackground(d: Pick<Draft, "bg" | "colors">) {
+  return d.bg.kind === "solid"
+    ? d.colors.background
+    : bgCss({ style: d.bg.kind, from: d.colors.background, to: d.bg.to });
+}
+
+/** Glass and outline buttons show the page through, so their text sits on the page background */
+const isSeeThrough = (v: ButtonVariant) => v === "glass" || v === "outline";
+
+/** The button text colour, swapped for black or white when it would be unreadable in this look */
+function readableButtonText(variant: ButtonVariant, colors: Colors) {
+  const behind = isSeeThrough(variant) ? colors.background : colors.button;
+  if (contrast(colors.buttonText, behind) >= 3) return colors.buttonText;
+  return contrast("#ffffff", behind) >= contrast("#0a0a0a", behind) ? "#ffffff" : "#0a0a0a";
+}
+
+/** Thumbnail-sized buttons: thinner outline, smaller hard shadow */
+const MINI_BTN = { "--btn-edge": "1.5px", "--btn-offset": "2.5px" } as CSSProperties;
+
 export function DesignCard({ draft, set }: { draft: Draft; set: (p: Partial<Draft>) => void }) {
-  const radius = cornerRadius(draft.corner);
+  // Any hand-made change turns the page into a custom theme
+  const tweak = (p: Partial<Draft>) => set({ ...p, preset: "custom" });
+  const pageBg = draftBackground(draft);
+  const seeThrough = isSeeThrough(draft.buttonVariant);
+  const against: Record<(typeof COLOR_FIELDS)[number]["key"], string | null> = {
+    button: draft.buttonVariant === "outline" ? draft.colors.background : null,
+    buttonText: seeThrough ? draft.colors.background : draft.colors.button,
+    name: draft.colors.background,
+    text: draft.colors.background,
+    icons: draft.colors.background,
+  };
+
   return (
     <>
-      <Card title="Theme" aside={draft.preset === "custom" && <span className={s.count}>Custom colours</span>}>
+      <Card title="Theme" aside={draft.preset === "custom" && <span className={s.count}>Customised</span>}>
         <div className={s.presetGrid} role="radiogroup" aria-label="Theme">
           {(Object.keys(PRESETS) as PresetKey[]).map((key) => {
-            const pc = presetColors(key);
+            const look = presetDraft(key);
             const on = draft.preset === key;
             return (
               <button
@@ -38,61 +94,177 @@ export function DesignCard({ draft, set }: { draft: Draft; set: (p: Partial<Draf
                 role="radio"
                 aria-checked={on}
                 className={cx(s.preset, on && s.presetOn)}
-                onClick={() => set({ preset: key, colors: pc, corner: PRESETS[key].linkStyle.corner })}
+                onClick={() => set(look)}
               >
-                <span className={s.presetCanvas} style={{ background: pc.background }} aria-hidden="true">
-                  <span className={s.presetDot} />
-                  {[0, 1, 2].map((i) => (
-                    <span key={i} className={s.presetPill} style={{ background: pc.button, borderRadius: radius }} />
-                  ))}
-                </span>
+                <ThemeSwatch design={look} />
                 <span className={s.presetName}>
-                  {PRESET_META[key].label}
+                  {PRESETS[key].label}
                   {on && <Check size={14} strokeWidth={3} aria-hidden="true" />}
                 </span>
+                <span className={s.presetTag}>{PRESETS[key].tagline}</span>
               </button>
             );
           })}
         </div>
       </Card>
 
+      <Card title="Background">
+        <Segmented
+          label="Background style"
+          value={draft.bg.kind}
+          onChange={(kind) => tweak({ bg: { ...draft.bg, kind } })}
+          options={BG_KINDS}
+        />
+        <div className={s.colorGrid} style={{ marginTop: 16 }}>
+          <ColorField
+            label={draft.bg.kind === "solid" ? "Colour" : draft.bg.kind === "glow" ? "Base" : "Top"}
+            value={draft.colors.background}
+            warn={false}
+            onChange={(v) => tweak({ colors: { ...draft.colors, background: v } })}
+          />
+          {draft.bg.kind !== "solid" && (
+            <ColorField
+              label={draft.bg.kind === "glow" ? "Glow" : "Bottom"}
+              value={draft.bg.to}
+              warn={false}
+              onChange={(to) => tweak({ bg: { ...draft.bg, to } })}
+            />
+          )}
+        </div>
+        <div className={s.settingRow} style={{ marginTop: 16 }}>
+          <div>
+            <p className={s.settingTitle}>Film grain</p>
+            <p className={s.settingDesc}>A fine texture that makes flat colours feel printed.</p>
+          </div>
+          <Switch checked={draft.grain} onChange={(grain) => tweak({ grain })} label="Film grain" />
+        </div>
+      </Card>
+
+      <Card title="Buttons">
+        <span className={s.label}>Style</span>
+        <div className={s.btnStyleGrid} role="radiogroup" aria-label="Button style">
+          {BUTTON_VARIANTS.map((v) => {
+            const look = buttonLook(v.id, {
+              fillValue: draft.colors.button,
+              textColor: readableButtonText(v.id, draft.colors),
+              corner: draft.corner,
+            });
+            const on = draft.buttonVariant === v.id;
+            return (
+              <button
+                key={v.id}
+                type="button"
+                role="radio"
+                aria-checked={on}
+                className={cx(s.btnStyle, on && s.btnStyleOn)}
+                onClick={() =>
+                  tweak({
+                    buttonVariant: v.id,
+                    colors: { ...draft.colors, buttonText: readableButtonText(v.id, draft.colors) },
+                  })
+                }
+              >
+                <span className={s.btnStyleCanvas} style={{ background: pageBg }} aria-hidden="true">
+                  <span
+                    className={cx(s.btnStyleSample, look.className)}
+                    style={{ ...look.style, ...MINI_BTN, fontFamily: fontVar(draft.bodyFont) }}
+                  >
+                    Aa
+                  </span>
+                </span>
+                <span className={s.btnStyleName}>{v.label}</span>
+              </button>
+            );
+          })}
+        </div>
+        <span className={s.label} style={{ marginTop: 18 }}>
+          Shape
+        </span>
+        <Segmented
+          label="Button shape"
+          value={draft.corner}
+          onChange={(corner) => tweak({ corner })}
+          options={BUTTON_CORNERS.map((c) => ({ value: c.id, label: c.label }))}
+        />
+      </Card>
+
       <Card title="Colours">
         <div className={s.colorGrid}>
-          {COLOR_FIELDS.map(({ key, label, against }) => (
+          {COLOR_FIELDS.map(({ key, label }) => (
             <ColorField
               key={key}
               label={label}
               value={draft.colors[key]}
-              warn={!!against && contrast(draft.colors[key], draft.colors[against]) < 3}
-              onChange={(v) => set({ preset: "custom", colors: { ...draft.colors, [key]: v } })}
+              warn={!!against[key] && contrast(draft.colors[key], against[key]) < 3}
+              onChange={(v) => tweak({ colors: { ...draft.colors, [key]: v } })}
             />
           ))}
         </div>
       </Card>
 
-      <Card title="Buttons">
-        <span className={s.label}>Shape</span>
-        <Segmented
-          label="Button shape"
-          value={draft.corner}
-          onChange={(corner) => set({ corner })}
-          options={BUTTON_CORNERS.map((c) => ({ value: c.id, label: c.label }))}
-        />
-      </Card>
-
-      <Card title="Font">
-        <label className={s.label} htmlFor="ed-font">
-          Name and text
-        </label>
-        <select id="ed-font" className={s.select} value={draft.font} onChange={(e) => set({ font: e.target.value })}>
-          {FONT_OPTIONS.map((f) => (
-            <option key={f.id} value={f.id}>
-              {f.label}
-            </option>
-          ))}
-        </select>
+      <Card title="Fonts">
+        <div className={s.row2}>
+          <FontSelect
+            label="Name and headings"
+            value={draft.titleFont}
+            onChange={(titleFont) => tweak({ titleFont })}
+          />
+          <FontSelect label="Bio and buttons" value={draft.bodyFont} onChange={(bodyFont) => tweak({ bodyFont })} />
+        </div>
       </Card>
     </>
+  );
+}
+
+function FontSelect({ label, value, onChange }: { label: string; value: string; onChange: (id: string) => void }) {
+  const id = useId();
+  return (
+    <div>
+      <label className={s.label} htmlFor={id}>
+        {label}
+      </label>
+      <select
+        id={id}
+        className={s.select}
+        value={value}
+        style={{ fontFamily: fontVar(value) }}
+        onChange={(e) => onChange(e.target.value)}
+      >
+        {FONT_OPTIONS.map((f) => (
+          <option key={f.id} value={f.id} style={{ fontFamily: fontVar(f.id) }}>
+            {f.label}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+/** A theme tile's mini page: its real background, name font and button look */
+function ThemeSwatch({ design }: { design: DesignFields }) {
+  const look = buttonLook(design.buttonVariant, {
+    fillValue: design.colors.button,
+    textColor: design.colors.buttonText,
+    corner: design.corner,
+  });
+  return (
+    <span className={s.presetCanvas} style={{ background: draftBackground(design) }} aria-hidden="true">
+      {design.grain && <span className="ul-grain" />}
+      <span className={s.presetDot} />
+      <span
+        className={s.presetTitle}
+        style={{
+          color: design.colors.name,
+          fontFamily: fontVar(design.titleFont),
+          fontWeight: titleStyle(design.titleFont).fontWeight,
+        }}
+      >
+        Aa
+      </span>
+      {[0, 1, 2].map((i) => (
+        <span key={i} className={cx(s.presetPill, look.className)} style={{ ...look.style, ...MINI_BTN }} />
+      ))}
+    </span>
   );
 }
 

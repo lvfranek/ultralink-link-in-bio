@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { getSiteUrl } from "@/lib/site-url";
 import { getLinkCap } from "@/lib/config/pricing";
-import { cornerRadius, resolveTheme } from "@/lib/config/theme";
+import { resolveTheme, type LinkStyle } from "@/lib/config/theme";
 import { isProActive } from "@/lib/supabase/types";
 import { getActiveOwnerId } from "@/lib/team";
 import { editedAgo, getWeekStats } from "@/lib/dashboard-stats";
@@ -30,11 +30,13 @@ function toCard(page: Page & { page_links: PreviewLink[] }): PageCardData {
     edited: editedAgo(page.updated_at),
     background: bg.type === "image" ? `#111 url("${bg.value}") center / cover` : bg.value,
     nameColor: theme.colors.name,
+    grain: theme.texture === "grain",
+    buttonVariant: theme.buttonVariant,
     buttons: page.page_links.map((l) => ({
       label: l.label,
       background: l.fill_value,
       color: l.text_color,
-      radius: cornerRadius(l.corner as Parameters<typeof cornerRadius>[0]),
+      corner: l.corner as LinkStyle["corner"],
     })),
   };
 }

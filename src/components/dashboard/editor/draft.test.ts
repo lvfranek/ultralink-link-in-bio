@@ -1,6 +1,16 @@
 import { describe, expect, it } from "vitest";
 import type { Page, PageLink, PageSocial } from "@/lib/supabase/types";
-import { draftFromPage, draftProblems, previewData, tidyUrl, toHex, urlError } from "./draft";
+import { PRESETS, resolveTheme } from "@/lib/config/theme";
+import {
+  draftFromPage,
+  draftProblems,
+  presetDraft,
+  previewData,
+  themeFromDraft,
+  tidyUrl,
+  toHex,
+  urlError,
+} from "./draft";
 
 const page = (overrides: Partial<Page> = {}): Page =>
   ({
@@ -85,11 +95,39 @@ describe("draftFromPage", () => {
 
   it("replaces a background image with the preset's colour", () => {
     const d = draftFromPage(
-      page({ theme: { preset: "sunset", pageBg: { type: "image", value: "https://x.com/bg.jpg", overlay: 0.2 } } }),
+      page({ theme: { preset: "editorial", pageBg: { type: "image", value: "https://x.com/bg.jpg", overlay: 0.2 } } }),
       [],
       socials,
     );
-    expect(d.colors.background).toBe("#ffffff");
+    expect(d.colors.background).toBe("#f3eee6");
+  });
+
+  it("brings back a saved theme exactly: gradient, grain, button look and both fonts", () => {
+    const design = presetDraft("noir");
+    const saved = themeFromDraft({ ...draftFromPage(page(), [], socials), ...design });
+    const d = draftFromPage(
+      page({ theme: saved }),
+      [link({ fill_value: PRESETS.noir.linkStyle.fillValue, text_color: "#ffffff", corner: "more" })],
+      socials,
+    );
+    expect(d.preset).toBe("noir");
+    expect(d.bg).toEqual({ kind: "glow", to: "#5b3df5" });
+    expect(d.colors.background).toBe("#0b0b0f");
+    expect(d.buttonVariant).toBe("glass");
+    expect([d.titleFont, d.bodyFont]).toEqual(["space-grotesk", "inter"]);
+    expect(resolveTheme(saved).pageBg.type).toBe("gradient");
+  });
+
+  it("shows pages on a removed preset as custom, with their own colours", () => {
+    const d = draftFromPage(
+      page({ theme: { preset: "glacier", pageBg: { type: "color", value: "#FFFFFF", overlay: 0 } } }),
+      [link({ fill_value: "#06AEEF" })],
+      socials,
+    );
+    expect(d.preset).toBe("custom");
+    expect(d.colors.button).toBe("#06aeef");
+    expect(d.buttonVariant).toBe("solid");
+    expect(d.bg.kind).toBe("solid");
   });
 
   it("keeps the Win-Back 18+ setting and the page age gate", () => {

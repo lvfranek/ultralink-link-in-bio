@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { validateSlug } from "@/lib/slug";
 import { getLinkCap } from "@/lib/config/pricing";
 import { getActiveOwnerId } from "@/lib/team";
-import type { Theme } from "@/lib/config/theme";
+import { PRESETS, type Theme } from "@/lib/config/theme";
 import { genericDbError } from "@/lib/db-error";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
 
@@ -16,19 +16,15 @@ export type ActionResult = { error: string } | { ok: true } | { ok: true; pageId
 // reference page so a fresh page looks intentional instead of a blank slate.
 const NEW_PAGE_BIO = "Hello world!";
 const NEW_PAGE_AVATAR_URL = "/favicon/favicon.png";
-const NEW_PAGE_THEME: Theme = {
-  preset: "custom",
-  pageBg: { type: "color", value: "#1E1E1E", overlay: 0 },
-  fonts: { title: "inter", body: "inter" },
-  colors: { name: "#FFFFFF", handle: "#DADADA", icons: "#DADADA" },
-};
+// New pages start on the Noir theme
+const NEW_PAGE_THEME: Theme = PRESETS.noir.theme;
 const NEW_PAGE_LINK = {
   label: "Link 1",
   url: "http://www.instagram.com/",
-  fill_type: "color",
-  fill_value: "#b8c9ff",
-  text_color: "#000000",
-  corner: "rounded",
+  fill_type: PRESETS.noir.linkStyle.fillType,
+  fill_value: PRESETS.noir.linkStyle.fillValue,
+  text_color: PRESETS.noir.linkStyle.textColor,
+  corner: PRESETS.noir.linkStyle.corner,
   animation: "none",
 };
 
