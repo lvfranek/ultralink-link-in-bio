@@ -14,7 +14,7 @@ import {
   DEFAULT_LINK_STYLE,
 } from "@/lib/config/theme";
 import type { Theme } from "@/lib/config/theme";
-import { isAdultConfirmed, showAdultGate } from "./adult-gate";
+import { showAdultGate } from "./adult-gate";
 
 interface WinBackOverlayProps {
   pageId: string;
@@ -91,11 +91,6 @@ export function WinBackOverlay({
           return;
         }
         e.preventDefault();
-        if (isAdultConfirmed()) {
-          beacon(pageId, "click");
-          window.open(winBack.url, "_blank", "noopener,noreferrer");
-          return;
-        }
         showAdultGate(() => {
           beacon(pageId, "click");
           window.open(winBack.url, "_blank", "noopener,noreferrer");

@@ -1,15 +1,10 @@
-const SESSION_KEY = "ultralink_adult_confirmed";
 const OVERLAY_ID = "__ul_gate";
 
-export function isAdultConfirmed(): boolean {
-  if (typeof window === "undefined") return false;
-  return sessionStorage.getItem(SESSION_KEY) === "1";
-}
-
 /**
- * Shows the shared 18+ confirmation interstitial. Reused by both per-link
- * click gating and the Win-Back overlay's optional age gate — do not
- * duplicate this markup elsewhere.
+ * Shows the shared 18+ confirmation interstitial on every click of a gated
+ * link; nothing is remembered, so an earlier "yes" never skips it. Reused by
+ * both per-link click gating and the Win-Back overlay's optional age gate —
+ * do not duplicate this markup elsewhere.
  */
 export function showAdultGate(onConfirm: () => void, onCancel?: () => void) {
   if (typeof document === "undefined") return;
@@ -92,7 +87,6 @@ export function showAdultGate(onConfirm: () => void, onCancel?: () => void) {
   }
 
   btnYes.addEventListener("click", () => {
-    sessionStorage.setItem(SESSION_KEY, "1");
     close();
     onConfirm();
   });

@@ -14,7 +14,7 @@ import {
 } from "@/lib/config/theme";
 import { SocialIcon } from "./social-icon";
 import { getPlatform } from "@/lib/config/socials";
-import { isAdultConfirmed, showAdultGate } from "./adult-gate";
+import { showAdultGate } from "./adult-gate";
 import Link from "next/link";
 
 interface ProfilePageViewProps {
@@ -441,7 +441,8 @@ function LinkButton({
 
   function handleClick(e: React.MouseEvent<HTMLAnchorElement>) {
     if (!link.is_adult || isPreview) return;
-    if (isAdultConfirmed()) return;
+    // Middle-click opens a new tab through auxclick, not click
+    if (e.type === "auxclick" && e.button !== 1) return;
     e.preventDefault();
     showAdultGate(() => window.open(redirectHref, "_blank", "noopener,noreferrer"));
   }
@@ -452,6 +453,7 @@ function LinkButton({
       target="_blank"
       rel="noopener noreferrer"
       onClick={handleClick}
+      onAuxClick={handleClick}
       className={[
         "relative flex items-center w-full font-medium",
         "px-5 py-4 text-sm",
